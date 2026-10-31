@@ -95,7 +95,7 @@ label { font-size: 0.78rem; color: var(--muted); display: flex; flex-direction: 
 @media (min-width: 960px) { .layout { grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); } }
 .stage { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 @media (min-width: 960px) { .stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 10px); } }
-#winSvg { width: 100%; height: auto; max-height: 86vh; display: block; user-select: none; -webkit-user-select: none; }
+#winSvg { width: 100%; height: auto; max-height: 86vh; display: block; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .readout { font-family: var(--font-data); font-size: 0.82rem; color: var(--muted); min-height: 1.3em; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .readout b { color: var(--ink); font-weight: 600; }
 .side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -147,6 +147,10 @@ tbody tr.sel { background: color-mix(in srgb, var(--focus) 16%, transparent); }
 .piece.sel .lead { stroke: var(--focus); stroke-width: 1.1; }
 .piece.overlap .lead { stroke: var(--danger); stroke-dasharray: 1.5 1; }
 .piece.dragging .lead { stroke: var(--focus); }
+.piece.resizing .lead { stroke: var(--focus); stroke-width: 1.1; stroke-dasharray: 2 1; }
+.piece.blocked .lead { stroke: var(--danger); stroke-dasharray: none; }
+.handle { fill: var(--panel); stroke: var(--focus); stroke-width: .5; pointer-events: none; }
+.handle-hit { fill: transparent; touch-action: none; }
 .plabel { font-family: var(--font-data); font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--sky-bot); stroke-width: .5px; pointer-events: none; }
 .tray-box { fill: none; stroke: var(--line); stroke-width: .4; stroke-dasharray: 2 1.5; }
 .tray-label { font-family: var(--font-body); font-size: 2.8px; fill: var(--muted); }
@@ -226,7 +230,7 @@ tbody tr.sel { background: color-mix(in srgb, var(--focus) 16%, transparent); }
   <main class="layout">
     <section class="stage" aria-label="Windows">
       <svg id="winSvg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Both windows to scale with placed film pieces"></svg>
-      <div class="readout" id="readout"><span id="readL">Drag a piece to move it. Tap to select it.</span><span id="readR"></span></div>
+      <div class="readout" id="readout"><span id="readL">Drag to move · tap to select · press and hold to resize</span><span id="readR"></span></div>
     </section>
 
     <aside class="side">
@@ -561,14 +565,16 @@ function renderAddPanel() {
 }
 
 let G = null; // current geometry
-function renderWindows() {
+let resizeId = null; // piece currently showing resize handles
+function renderWindows(st = state) {
   const svg = $('#winSvg');
-  G = geom(state);
+  if (resizeId) { const rp = st.pieces.find(q => q.id === resizeId); if (!rp || rp.win === null) resizeId = null; }
+  G = geom(st);
   svg.setAttribute('viewBox', `0 0 ${G.W} ${G.H}`);
   svg.innerHTML = defsMarkup();
-  const ov = overlapIds(state);
+  const ov = overlapIds(st);
   G.wins.forEach((w, i) => {
-    const S = state.settings.windows[i];
+    const S = st.settings.windows[i];
     el('rect', { x: w.x - 1.6, y: w.y - 1.6, width: w.w + 3.2, height: w.h + 3.2, class: 'frame', 'stroke-width': 2.2, rx: .6 }, svg);
     el('rect', { x: w.x, y: w.y, width: w.w, height: w.h, class: 'glass', 'data-win': i }, svg);
     for (let gx = 5; gx < w.w; gx += 5) el('line', { x1: w.x + gx, y1: w.y, x2: w.x + gx, y2: w.y + w.h, class: 'gridline' + (gx % 10 === 0 ? ' major' : '') }, svg);
@@ -578,10 +584,24 @@ function renderWindows() {
   });
   el('rect', { x: M, y: G.trayY, width: G.W - 2 * M, height: G.trayH, class: 'tray-box', rx: 1.5 }, svg);
   const tl = el('text', { x: M + 2, y: G.trayY - 1.8, class: 'tray-label' }, svg);
-  tl.textContent = state.pieces.some(p => p.win === null) ? 'Unplaced: drag onto a window' : 'Unplaced tray (drag pieces here to take them off a window)';
+  tl.textContent = st.pieces.some(p => p.win === null) ? 'Unplaced: drag onto a window' : 'Unplaced tray (drag pieces here to take them off a window)';
   const layer = el('g', { id: 'pieces' }, svg);
-  for (const p of state.pieces) drawPiece(layer, p, ov.has(p.id));
+  for (const p of st.pieces) drawPiece(layer, p, ov.has(p.id));
+  if (resizeId) drawHandles(svg, st.pieces.find(q => q.id === resizeId));
   const tip = el('text', { id: 'dragTip', class: 'drag-tip', x: 0, y: 0 }, svg); tip.style.display = 'none';
+}
+// Handle sizes are set in screen pixels so they stay finger-sized on a phone.
+function pxPerCm() { const r = $('#winSvg').getBoundingClientRect(); return r.width ? r.width / G.W : 4; }
+const HANDLES = { nw: [0, 0, 'nwse'], n: [.5, 0, 'ns'], ne: [1, 0, 'nesw'], e: [1, .5, 'ew'], se: [1, 1, 'nwse'], s: [.5, 1, 'ns'], sw: [0, 1, 'nesw'], w: [0, .5, 'ew'] };
+function drawHandles(svg, p) {
+  const a = absPos(p), k = pxPerCm(), rv = 6 / k, rh = 16 / k;
+  const g = el('g', { id: 'handles' }, svg);
+  for (const [h, [fx, fy, cur]] of Object.entries(HANDLES)) {
+    if (h.length === 1 && ((fx === .5 && p.w < rh * 3.2) || (fy === .5 && p.h < rh * 3.2))) continue;
+    const cx = a.x + p.w * fx, cy = a.y + p.h * fy;
+    const hit = el('circle', { cx, cy, r: rh, class: 'handle-hit', 'data-h': h }, g); hit.style.cursor = cur + '-resize';
+    el('circle', { cx, cy, r: rv, class: 'handle' }, g);
+  }
 }
 function absPos(p) {
   if (p.win === null) return G.trayPos[p.id] || { x: M + 3, y: G.trayY + 6 };
@@ -589,7 +609,8 @@ function absPos(p) {
 }
 function drawPiece(layer, p, overlap) {
   const a = absPos(p);
-  const g = el('g', { class: 'piece' + (p.id === selected ? ' sel' : '') + (overlap ? ' overlap' : ''), 'data-id': p.id, transform: `translate(${a.x} ${a.y})` }, layer);
+  const cls = 'piece' + (p.id === selected ? ' sel' : '') + (overlap ? ' overlap' : '') + (p.id === resizeId ? ' resizing' : '') + (drag && drag.blocked && drag.id === p.id ? ' blocked' : '');
+  const g = el('g', { class: cls, 'data-id': p.id, transform: `translate(${a.x} ${a.y})` }, layer);
   el('rect', { width: p.w, height: p.h, fill: fillFor(p.sheet, p.flute) }, g);
   el('rect', { width: p.w, height: p.h, class: 'lead' }, g);
   el('rect', { x: -1, y: -1, width: p.w + 2, height: p.h + 2, class: 'hit' }, g);
@@ -629,6 +650,7 @@ function renderSelected() {
         <button type="button" data-n="-1,0" title="Left">←</button><button type="button" data-n="0,-1" title="Up">↑</button><button type="button" data-n="0,1" title="Down">↓</button><button type="button" data-n="1,0" title="Right">→</button>
       </div>
       <div class="row">
+        ${p.win !== null ? `<button type="button" id="sRes">${resizeId === p.id ? 'Done resizing' : 'Resize'}</button>` : ''}
         <button type="button" id="sRot">Rotate 90°</button>
         <button type="button" id="sDup">Duplicate</button>
         <button type="button" id="sDel" class="danger">Delete</button>
@@ -653,6 +675,10 @@ function renderSelected() {
     q.win = +v; q.x = spot ? spot.x : 0; q.y = spot ? spot.y : 0; commit(n, q);
   };
   box.querySelectorAll('[data-n]').forEach(b => b.onclick = () => nudge(b.dataset.n.split(',').map(Number)));
+  if ($('#sRes')) $('#sRes').onclick = () => {
+    if (resizeId === p.id) { exitResize(); return; }
+    resizeId = p.id; renderWindows(); renderSelected(); setHint(RESIZE_HINT(p.id));
+  };
   $('#sRot').onclick = () => rotateSel();
   $('#sDup').onclick = () => duplicateSel();
   $('#sDel').onclick = () => deleteSel();
@@ -725,7 +751,9 @@ function renderList() {
   $('#list').querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => select(tr.dataset.id));
 }
 
-function select(id) { selected = id; renderWindows(); renderSelected(); renderSheets(); renderList(); }
+function select(id) {
+  if (resizeId && id !== resizeId) { resizeId = null; setHint(); }
+  selected = id; renderWindows(); renderSelected(); renderSheets(); renderList(); }
 
 /* ---------------- Add ---------------- */
 function addPieces() {
@@ -767,20 +795,84 @@ function svgPt(e) {
   const svg = $('#winSvg'); const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
   return pt.matrixTransform(svg.getScreenCTM().inverse());
 }
+const DEFAULT_HINT = 'Drag to move · tap to select · press and hold to resize';
+const RESIZE_HINT = id => `<b>${esc(id)}</b> resize mode · drag a handle · tap empty glass when done`;
+const LONG_PRESS_MS = 450, MOVE_PX = 7;
+function setHint(html) { $('#readL').innerHTML = html || esc(DEFAULT_HINT); $('#readR').textContent = ''; }
+function exitResize() { if (!resizeId) return; resizeId = null; renderWindows(); renderSelected(); setHint(); }
 function onDown(e) {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const hEl = e.target.closest && e.target.closest('.handle-hit');
+  if (hEl && resizeId) {
+    e.preventDefault();
+    startResize(resizeId, hEl.dataset.h, svgPt(e), e.clientX, e.clientY);
+    try { $('#winSvg').setPointerCapture(e.pointerId); } catch (_) {}
+    return;
+  }
   const g = e.target.closest && e.target.closest('.piece');
-  if (!g) { if (e.target.closest && (e.target.classList.contains('glass') || e.target === $('#winSvg'))) { if (selected) select(null); } return; }
-  if (e.button !== undefined && e.button !== 0) return;
+  if (!g) {
+    if (e.target.closest && (e.target.classList.contains('glass') || e.target === $('#winSvg'))) {
+      if (resizeId) { resizeId = null; setHint(); }
+      if (selected) select(null); else renderWindows();
+    }
+    return;
+  }
   e.preventDefault();
   const p = pieceById(g.dataset.id); const a = absPos(p); const pt = svgPt(e);
-  drag = { id: p.id, g, offX: pt.x - a.x, offY: pt.y - a.y, sx: pt.x, sy: pt.y, moved: false, target: { win: p.win, x: p.x, y: p.y } };
+  drag = { mode: 'move', id: p.id, g, offX: pt.x - a.x, offY: pt.y - a.y, sx: pt.x, sy: pt.y, cx0: e.clientX, cy0: e.clientY, moved: false, target: { win: p.win, x: p.x, y: p.y } };
+  if (p.win !== null) drag.timer = setTimeout(longPress, LONG_PRESS_MS);
   try { $('#winSvg').setPointerCapture(e.pointerId); } catch (_) {}
+}
+// Holding still on a placed piece switches it to resize mode. Keep holding and drag to resize
+// from the corner nearest your finger, or let go and use the handles.
+function longPress() {
+  if (!drag || drag.moved || drag.mode !== 'move') return;
+  const p = pieceById(drag.id); if (!p || p.win === null) return;
+  const a = absPos(p);
+  const h = ((drag.sy - a.y) / p.h < .5 ? 'n' : 's') + ((drag.sx - a.x) / p.w < .5 ? 'w' : 'e');
+  resizeId = p.id; selected = p.id;
+  try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {}
+  startResize(p.id, h, { x: drag.sx, y: drag.sy }, drag.cx0, drag.cy0);
+  renderWindows(); renderSelected(); renderList(); renderSheets();
+  setHint(RESIZE_HINT(p.id));
+}
+function startResize(id, h, pt, cx0, cy0) {
+  const p = pieceById(id);
+  drag = { mode: 'resize', id, h, sx: pt.x, sy: pt.y, cx0, cy0, moved: false, start: { x: p.x, y: p.y, w: p.w, h: p.h }, valid: null, blocked: false };
+}
+function resizeMove(e) {
+  const pt = svgPt(e), p = pieceById(drag.id), S = state.settings.windows[p.win];
+  const snap = +state.settings.snap || 1, MIN = Math.max(1, snap);
+  const s = drag.start, dx = pt.x - drag.sx, dy = pt.y - drag.sy;
+  const sn = v => Math.round(v / snap) * snap, r = v => Math.round(v * 100) / 100;
+  let x0 = s.x, y0 = s.y, x1 = s.x + s.w, y1 = s.y + s.h;
+  if (drag.h.includes('e')) x1 = Math.min(S.w, Math.max(x0 + MIN, sn(x1 + dx)));
+  if (drag.h.includes('w')) x0 = Math.max(0, Math.min(x1 - MIN, sn(x0 + dx)));
+  if (drag.h.includes('s')) y1 = Math.min(S.h, Math.max(y0 + MIN, sn(y1 + dy)));
+  if (drag.h.includes('n')) y0 = Math.max(0, Math.min(y1 - MIN, sn(y0 + dy)));
+  const cand = { x: r(x0), y: r(y0), w: r(x1 - x0), h: r(y1 - y0) };
+  const last = drag.valid || s;
+  if (cand.x === last.x && cand.y === last.y && cand.w === last.w && cand.h === last.h) return;
+  // Only accept sizes the sheet can still supply; otherwise the piece stops growing.
+  const n = clone(state); Object.assign(pieceById(drag.id, n), cand);
+  const ok = computePacks(n).ok;
+  drag.blocked = !ok;
+  if (ok) drag.valid = cand;
+  const v = drag.valid || s;
+  const show = clone(state); Object.assign(pieceById(drag.id, show), v);
+  renderWindows(show);
+  $('#readL').innerHTML = `<b>${esc(p.id)}</b> → ${fmt(v.w)} × ${fmt(v.h)} cm` + (ok ? '' : ` <span class="warn">· not enough ${esc(sheetOf(p.sheet).name)} film left</span>`);
+  $('#readR').textContent = `${fmt(v.x)}, ${fmt(v.y)} from top-left`;
 }
 function onMove(e) {
   if (!drag) return;
+  if (!drag.moved) {
+    if (Math.hypot(e.clientX - drag.cx0, e.clientY - drag.cy0) < MOVE_PX) return;
+    drag.moved = true; clearTimeout(drag.timer);
+    if (drag.mode === 'move') { drag.g.classList.add('dragging'); drag.g.parentNode.appendChild(drag.g); const hd = $('#handles'); if (hd) hd.remove(); }
+  }
+  if (drag.mode === 'resize') { resizeMove(e); return; }
   const pt = svgPt(e);
-  if (!drag.moved && Math.hypot(pt.x - drag.sx, pt.y - drag.sy) < 1) return;
-  if (!drag.moved) { drag.moved = true; drag.g.classList.add('dragging'); drag.g.parentNode.appendChild(drag.g); }
   const p = pieceById(drag.id);
   const ax = pt.x - drag.offX, ay = pt.y - drag.offY, cx = ax + p.w / 2, cy = ay + p.h / 2;
   let win = null;
@@ -817,14 +909,23 @@ function onMove(e) {
 }
 function onUp() {
   if (!drag) return;
-  const d = drag; drag = null;
-  if (!d.moved) { select(d.id); return; }
+  const d = drag; drag = null; clearTimeout(d.timer);
+  if (d.mode === 'resize') {
+    if (d.valid) { const n = clone(state); const q = pieceById(d.id, n); Object.assign(q, d.valid); commit(n, q); }
+    else renderWindows();
+    if (d.blocked) toast('Not enough ' + sheetOf(pieceById(d.id).sheet).name + ' film left to make ' + d.id + ' any bigger.', true);
+    setHint(RESIZE_HINT(d.id));
+    return;
+  }
+  if (!d.moved) {
+    if (resizeId === d.id) { resizeId = null; select(d.id); setHint(); return; }
+    select(d.id); return;
+  }
   const n = clone(state); const q = pieceById(d.id, n);
   Object.assign(q, d.target);
   selected = d.id;
-  $('#readR').textContent = '';
   commit(n, q);
-  $('#readL').textContent = 'Drag a piece to move it. Tap to select it.';
+  setHint(resizeId ? RESIZE_HINT(resizeId) : '');
 }
 
 /* ---------------- Save / load ---------------- */
@@ -1026,7 +1127,9 @@ function boot() {
   svg.addEventListener('pointermove', onMove);
   svg.addEventListener('pointerup', onUp);
   svg.addEventListener('pointercancel', onUp);
-  svg.addEventListener('touchstart', e => { if (e.target.closest && e.target.closest('.piece')) e.preventDefault(); }, { passive: false });
+  svg.addEventListener('touchstart', e => { if (e.target.closest && e.target.closest('.piece, .handle-hit')) e.preventDefault(); }, { passive: false });
+  svg.addEventListener('contextmenu', e => e.preventDefault());
+  setHint();
 
   $('#btnAdd').onclick = addPieces;
   $('#btnUndo').onclick = doUndo;
@@ -1045,7 +1148,7 @@ function boot() {
   document.addEventListener('keydown', e => {
     const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName);
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); doUndo(); return; }
-    if (e.key === 'Escape') { $('#settingsModal').hidden = true; $('#specModal').hidden = true; return; }
+    if (e.key === 'Escape') { $('#settingsModal').hidden = true; $('#specModal').hidden = true; exitResize(); return; }
     if (typing || !selected) return;
     const m = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
     if (m) { e.preventDefault(); nudge(m); }
