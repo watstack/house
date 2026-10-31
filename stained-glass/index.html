@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>Window Glass Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: workbench — the two windows to scale on the left, cutting stock and piece controls on the right; stacks on phones. */
+:root {
+  --bg: #e6ecea;
+  --panel: #f6f8f7;
+  --ink: #1b2425;
+  --muted: #5a6869;
+  --line: #c9d3d1;
+  --lead: #23292c;
+  --tea: #a45c16;
+  --tea-hi: #e9b46a;
+  --tea-lo: #6e3a0b;
+  --clear: #7fa6b1;
+  --clear-hi: #ffffff;
+  --clear-lo: #b9cdd3;
+  --sky-top: #d4e3ea;
+  --sky-bot: #f1f5f3;
+  --danger: #b8322a;
+  --ok: #2f7a4f;
+  --focus: #1f6f8b;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121819; --panel: #1a2223; --ink: #e2eae9; --muted: #92a1a1; --line: #2d393a;
+    --lead: #050708; --tea: #d0893f; --tea-hi: #f3c27e; --tea-lo: #7a4210;
+    --clear: #9cc4ce; --clear-hi: #e8f3f6; --clear-lo: #6f8f98;
+    --sky-top: #24343b; --sky-bot: #1b2528; --danger: #e5675d; --ok: #5cb882; --focus: #6cc3df;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121819; --panel: #1a2223; --ink: #e2eae9; --muted: #92a1a1; --line: #2d393a;
+  --lead: #050708; --tea: #d0893f; --tea-hi: #f3c27e; --tea-lo: #7a4210;
+  --clear: #9cc4ce; --clear-hi: #e8f3f6; --clear-lo: #6f8f98;
+  --sky-top: #24343b; --sky-bot: #1b2528; --danger: #e5675d; --ok: #5cb882; --focus: #6cc3df;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+.app { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 40px; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.num, .mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+
+/* Header */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.brand { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; }
+.ver { display: flex; align-items: center; gap: 6px; }
+.ver input { width: 13rem; max-width: 60vw; }
+.ver .tag { font-family: var(--font-data); font-size: 0.8rem; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+button, .btn { font: inherit; font-weight: 600; font-size: 0.88rem; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 7px 12px; border-radius: 6px; cursor: pointer; line-height: 1.2; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+button.danger { color: var(--danger); }
+button.danger.armed { background: var(--danger); color: var(--panel); border-color: var(--danger); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+input, select { font: inherit; font-size: 0.92rem; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; min-width: 0; }
+input[type=number] { font-family: var(--font-data); width: 100%; }
+label { font-size: 0.78rem; color: var(--muted); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+/* Stock meters */
+.stock { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.meter { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; }
+.meter .row1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.meter .name { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.meter .bar { height: 8px; border-radius: 4px; background: var(--bg); overflow: hidden; border: 1px solid var(--line); }
+.meter .bar i { display: block; height: 100%; }
+.meter .detail { font-size: 0.8rem; color: var(--muted); }
+.sw { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid var(--lead); display: inline-block; flex: none; }
+.sw.C { background: repeating-linear-gradient(90deg, var(--clear-lo) 0 3px, var(--clear-hi) 3px 6px); }
+.sw.T { background: repeating-linear-gradient(90deg, var(--tea-lo) 0 3px, var(--tea-hi) 3px 6px); }
+
+/* Main layout */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (min-width: 960px) { .layout { grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); } }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+@media (min-width: 960px) { .stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 10px); } }
+#winSvg { width: 100%; height: auto; max-height: 86vh; display: block; user-select: none; -webkit-user-select: none; }
+.readout { font-family: var(--font-data); font-size: 0.82rem; color: var(--muted); min-height: 1.3em; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.readout b { color: var(--ink); font-weight: 600; }
+.side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 440px) { .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; flex: 1; background: transparent; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 8px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.presets { display: flex; flex-wrap: wrap; gap: 5px; }
+.presets button { font-family: var(--font-data); font-weight: 400; font-size: 0.78rem; padding: 4px 8px; }
+.note { font-size: 0.8rem; color: var(--muted); margin: 0; }
+.empty { font-size: 0.85rem; color: var(--muted); margin: 0; }
+.nudge { display: grid; grid-template-columns: repeat(4, 2.4rem); gap: 4px; }
+.nudge button { padding: 6px 0; }
+
+/* Sheets */
+.sheets { display: grid; gap: 12px; }
+.sheet-card { display: grid; gap: 4px; }
+.sheet-card .cap { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 0.82rem; }
+.sheet-card svg { width: 100%; height: auto; display: block; }
+
+/* Table */
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+th { text-align: left; font-weight: 600; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: .06em; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+td { padding: 5px 6px; border-bottom: 1px solid var(--line); font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--bg); }
+tbody tr.sel { background: color-mix(in srgb, var(--focus) 16%, transparent); }
+.warn { color: var(--danger); }
+
+/* SVG */
+.glass { fill: url(#sky); }
+.frame { fill: none; stroke: var(--lead); }
+.gridline { stroke: var(--clear-lo); stroke-width: .12; opacity: .55; }
+.gridline.major { opacity: 1; stroke-width: .18; }
+.wlabel { font-family: var(--font-display); font-weight: 700; font-size: 3.4px; fill: var(--ink); }
+.wdim { font-family: var(--font-data); font-size: 2.6px; fill: var(--muted); }
+.piece { cursor: grab; touch-action: none; }
+.piece.dragging { cursor: grabbing; }
+.piece .lead { fill: none; stroke: var(--lead); stroke-width: .8; }
+.piece .hit { fill: transparent; }
+.piece.sel .lead { stroke: var(--focus); stroke-width: 1.1; }
+.piece.overlap .lead { stroke: var(--danger); stroke-dasharray: 1.5 1; }
+.piece.dragging .lead { stroke: var(--focus); }
+.plabel { font-family: var(--font-data); font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--sky-bot); stroke-width: .5px; pointer-events: none; }
+.tray-box { fill: none; stroke: var(--line); stroke-width: .4; stroke-dasharray: 2 1.5; }
+.tray-label { font-family: var(--font-body); font-size: 2.8px; fill: var(--muted); }
+.drag-tip { font-family: var(--font-data); font-size: 3px; fill: var(--focus); font-weight: 600; paint-order: stroke; stroke: var(--panel); stroke-width: .8px; pointer-events: none; }
+.sheet-bg { fill: var(--bg); stroke: var(--lead); stroke-width: .6; }
+.sheet-rib { stroke: var(--line); stroke-width: .25; }
+.sheet-piece { stroke: var(--lead); stroke-width: .5; cursor: pointer; }
+.sheet-piece.sel { stroke: var(--focus); stroke-width: 1; }
+.sheet-label { font-family: var(--font-data); font-weight: 600; fill: var(--ink); pointer-events: none; paint-order: stroke; stroke: var(--bg); stroke-width: .5px; }
+.st-tea-lo { stop-color: var(--tea-lo); } .st-tea-hi { stop-color: var(--tea-hi); } .st-tea { stop-color: var(--tea); }
+.st-cl-lo { stop-color: var(--clear-lo); } .st-cl-hi { stop-color: var(--clear-hi); } .st-cl { stop-color: var(--clear); }
+.st-sky-top { stop-color: var(--sky-top); } .st-sky-bot { stop-color: var(--sky-bot); }
+
+/* Toast */
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--panel); padding: 10px 14px; border-radius: 8px; font-size: 0.88rem; max-width: min(92vw, 560px); z-index: 50; box-shadow: 0 6px 24px rgb(0 0 0 / .25); }
+.toast.err { background: var(--danger); color: #fff; }
+
+/* Modal (settings + spec) */
+.modal { position: fixed; inset: 0; background: rgb(10 14 15 / .55); z-index: 40; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: calc(env(safe-area-inset-top, 0px) + 20px) max(12px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 20px) max(12px, env(safe-area-inset-left, 0px)); }
+.modal-card { background: var(--panel); color: var(--ink); border-radius: 12px; padding: 16px; width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 14px; }
+.modal-card.wide { max-width: 980px; background: #fff; color: #111; }
+.modal-card fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; margin: 0; }
+.modal-card legend { font-size: .78rem; font-weight: 700; color: var(--muted); padding: 0 4px; text-transform: uppercase; letter-spacing: .06em; }
+.spec-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; }
+.spec-tools .note { color: #555; }
+.spec-tools button { background: #f3f3f3; color: #111; border-color: #ccc; }
+.spec-tools button.primary { background: #111; color: #fff; border-color: #111; }
+
+/* Spec sheet (black and white friendly; also used in the downloaded file) */
+.spec { font-family: var(--font-body); color: #111; background: #fff; display: grid; gap: 18px; }
+.spec h1 { font-size: 20px; }
+.spec h2 { color: #333; font-size: 12px; margin-bottom: 6px; }
+.spec .meta { font-size: 12px; color: #444; display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.spec svg { width: 100%; height: auto; display: block; }
+.spec .sheets-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.spec table { font-size: 11px; }
+.spec th, .spec td { border-bottom: 1px solid #ccc; color: #111; padding: 3px 5px; }
+.spec .warnbox { border: 1.5px solid #111; padding: 6px 8px; font-size: 12px; }
+.spec-win svg { max-height: 760px; }
+
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  body { background: #fff !important; }
+  .app, .toast, #settingsModal { display: none !important; }
+  #specModal { position: static; display: block !important; background: none; padding: 0; overflow: visible; }
+  #specModal .modal-card { max-width: none; padding: 0; border-radius: 0; }
+  .spec-tools { display: none !important; }
+  .spec .page-break { break-before: page; }
+  .spec table { break-inside: auto; }
+  .spec tr { break-inside: avoid; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Window Glass Planner</h1>
+      <div class="ver">
+        <input id="verName" type="text" aria-label="Version name" maxlength="60">
+        <span class="tag" id="verTag">v1</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="btnUndo" title="Undo (Ctrl+Z)">Undo</button>
+      <button id="btnSave" class="primary">Save version</button>
+      <button id="btnLoad">Load</button>
+      <button id="btnSpec">Print spec</button>
+      <button id="btnSettings">Settings</button>
+      <button id="btnClear" class="danger">Clear all</button>
+      <input id="fileIn" type="file" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <section class="stock" id="stock" aria-label="Film left on each sheet"></section>
+
+  <main class="layout">
+    <section class="stage" aria-label="Windows">
+      <svg id="winSvg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Both windows to scale with placed film pieces"></svg>
+      <div class="readout" id="readout"><span id="readL">Drag a piece to move it. Tap to select it.</span><span id="readR"></span></div>
+    </section>
+
+    <aside class="side">
+      <section class="panel" id="addPanel">
+        <div class="panel-head"><h2>New piece</h2><span class="note" id="addFrom"></span></div>
+        <div class="seg" role="group" aria-label="Film colour" id="addColour"></div>
+        <div class="grid2">
+          <label for="addW">Width (cm)<input id="addW" type="number" min="1" step="0.5" value="20"></label>
+          <label for="addH">Height (cm)<input id="addH" type="number" min="1" step="0.5" value="20"></label>
+        </div>
+        <div class="presets" id="presets"></div>
+        <div class="grid2">
+          <label for="addFlute">Flutes run
+            <select id="addFlute"><option value="v">Vertically ┃┃┃</option><option value="h">Horizontally ☰</option></select>
+          </label>
+          <label for="addTarget">Put it on
+            <select id="addTarget"></select>
+          </label>
+        </div>
+        <div class="row"><label for="addQty" style="flex-direction:row;align-items:center;gap:6px">Qty <input id="addQty" type="number" min="1" max="40" step="1" value="1" style="width:4.5rem"></label><button id="btnAdd" class="primary" style="flex:1">Cut from sheet</button></div>
+        <p class="note">Each piece is taken from what's left of that colour's sheet. If it won't fit, it isn't added.</p>
+      </section>
+
+      <section class="panel" id="selPanel"></section>
+
+      <section class="panel">
+        <div class="panel-head"><h2>Cutting sheets</h2><span class="note" id="kerfNote"></span></div>
+        <div class="sheets" id="sheets"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2>Pieces</h2><span class="note" id="pieceCount"></span></div>
+        <div class="tablewrap" id="list"></div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+
+<div class="modal" id="settingsModal" hidden>
+  <form class="modal-card" id="settingsForm">
+    <div class="panel-head"><h2>Settings</h2><button type="button" id="setClose">Close</button></div>
+    <fieldset><legend>Windows (glass size, cm)</legend><div id="setWins" class="grid3"></div></fieldset>
+    <fieldset><legend>Film sheets (cm)</legend><div id="setSheets" class="grid3"></div></fieldset>
+    <fieldset><legend>Cutting</legend>
+      <div class="grid2">
+        <label for="setKerf">Gap between cuts (cm)<input id="setKerf" type="number" min="0" max="5" step="0.1"></label>
+        <label for="setSnap">Snap to grid (cm)<input id="setSnap" type="number" min="0.1" max="10" step="0.1"></label>
+      </div>
+      <label for="setAxis">On the sheet, the flutes run parallel to the
+        <select id="setAxis"><option value="h">height side (the 100 cm edge)</option><option value="w">width side (the 152 cm edge)</option></select>
+      </label>
+      <p class="note">Check this on the actual roll. It decides which way each piece has to be cut so its flutes end up the way you chose.</p>
+    </fieldset>
+    <div class="row" style="justify-content:flex-end"><button type="submit" class="primary">Apply</button></div>
+  </form>
+</div>
+
+<div class="modal" id="specModal" hidden>
+  <div class="modal-card wide">
+    <div class="spec-tools">
+      <div class="row"><button class="primary" id="specPrint">Print</button><button id="specDownload">Download spec (HTML)</button><button id="specClose">Close</button></div>
+      <p class="note">If Print does nothing here, download the spec, open it in your browser and print from there.</p>
+    </div>
+    <div class="spec" id="specBody"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const NS = 'http://www.w3.org/2000/svg';
+const $ = s => document.querySelector(s);
+const EPS = 1e-6;
+const fmt = v => { const r = Math.round(v * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const STORE_KEY = 'window-glass-planner:v1';
+
+const DEFAULT_SETTINGS = {
+  windows: [ { name: 'Left', w: 69, h: 170 }, { name: 'Right', w: 69, h: 170 } ],
+  sheets: [ { id: 'C', name: 'Clear', w: 152, h: 100 }, { id: 'T', name: 'Tea', w: 152, h: 100 } ],
+  kerf: 0.5, snap: 1, fluteAxis: 'h'
+};
+
+function exampleState() {
+  const P = (id, sheet, w, h, flute, win, x, y) => ({ id, sheet, w, h, flute, win, x, y });
+  const pieces = [];
+  let c = 0, t = 0;
+  for (let win = 0; win < 2; win++) {
+    pieces.push(P('T' + (++t), 'T', 69, 12, 'h', win, 0, 0));
+    pieces.push(P('C' + (++c), 'C', 69, 50, 'v', win, 0, 12));
+    pieces.push(P('C' + (++c), 'C', 23, 23, 'h', win, 0, 62));
+    pieces.push(P('T' + (++t), 'T', 23, 23, 'h', win, 23, 62));
+    pieces.push(P('C' + (++c), 'C', 23, 23, 'h', win, 46, 62));
+    pieces.push(P('T' + (++t), 'T', 69, 30, 'v', win, 0, 140));
+  }
+  return { name: 'Example layout', version: 1, settings: clone(DEFAULT_SETTINGS), pieces, seq: { C: c, T: t } };
+}
+
+/* ---------------- Sheet packing (MaxRects, best short side fit) ---------------- */
+function footprint(p, S) {
+  const ribsVerticalOnSheet = S.fluteAxis === 'h';
+  const rot = (p.flute === 'v') !== ribsVerticalOnSheet;
+  return rot ? { w: p.h, h: p.w, rot } : { w: p.w, h: p.h, rot };
+}
+function maxRects(W, H, items) {
+  let free = [{ x: 0, y: 0, w: W, h: H }];
+  const out = [];
+  for (const it of items) {
+    let best = null;
+    for (const f of free) {
+      if (it.w <= f.w + EPS && it.h <= f.h + EPS) {
+        const dw = f.w - it.w, dh = f.h - it.h;
+        const ss = Math.min(dw, dh), ls = Math.max(dw, dh);
+        if (!best || ss < best.ss - EPS || (Math.abs(ss - best.ss) < EPS && ls < best.ls)) best = { x: f.x, y: f.y, ss, ls };
+      }
+    }
+    if (!best) return null;
+    const r = { x: best.x, y: best.y, w: it.w, h: it.h };
+    out.push(Object.assign({}, it, { x: r.x, y: r.y }));
+    const nf = [];
+    for (const f of free) {
+      if (r.x >= f.x + f.w - EPS || r.x + r.w <= f.x + EPS || r.y >= f.y + f.h - EPS || r.y + r.h <= f.y + EPS) { nf.push(f); continue; }
+      if (r.x > f.x + EPS) nf.push({ x: f.x, y: f.y, w: r.x - f.x, h: f.h });
+      if (r.x + r.w < f.x + f.w - EPS) nf.push({ x: r.x + r.w, y: f.y, w: f.x + f.w - r.x - r.w, h: f.h });
+      if (r.y > f.y + EPS) nf.push({ x: f.x, y: f.y, w: f.w, h: r.y - f.y });
+      if (r.y + r.h < f.y + f.h - EPS) nf.push({ x: f.x, y: r.y + r.h, w: f.w, h: f.y + f.h - r.y - r.h });
+    }
+    const inside = (a, b) => a.x >= b.x - EPS && a.y >= b.y - EPS && a.x + a.w <= b.x + b.w + EPS && a.y + a.h <= b.y + b.h + EPS;
+    free = nf.filter((a, i) => !nf.some((b, j) => j !== i && inside(a, b) && (j < i || !inside(b, a))));
+  }
+  return { placed: out, free };
+}
+const ORDERS = [
+  (a, b) => b.w * b.h - a.w * a.h,
+  (a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h),
+  (a, b) => b.h - a.h || b.w - a.w,
+  (a, b) => b.w - a.w || b.h - a.h,
+  (a, b) => (b.w + b.h) - (a.w + a.h),
+  (a, b) => Math.min(b.w, b.h) - Math.min(a.w, a.h)
+];
+function packSheet(sheet, pieces, S) {
+  const k = Math.max(0, +S.kerf || 0);
+  const area = sheet.w * sheet.h;
+  const items = pieces.map(p => { const f = footprint(p, S); return { id: p.id, w: f.w + k, h: f.h + k, pw: f.w, ph: f.h, rot: f.rot }; });
+  if (!items.length) return { placed: [], used: 0, area, largest: { w: sheet.w, h: sheet.h } };
+  let best = null;
+  for (const ord of ORDERS) {
+    const sorted = items.slice().sort((a, b) => ord(a, b) || (a.id < b.id ? -1 : 1));
+    const r = maxRects(sheet.w + k, sheet.h + k, sorted);
+    if (!r) continue;
+    let lg = { w: 0, h: 0 };
+    for (const f of r.free) { const w = Math.max(0, f.w - k), h = Math.max(0, f.h - k); if (w * h > lg.w * lg.h) lg = { w, h }; }
+    if (!best || lg.w * lg.h > best.largest.w * best.largest.h) best = { r, largest: lg };
+  }
+  if (!best) return null;
+  const placed = best.r.placed.map(it => ({ id: it.id, x: it.x, y: it.y, w: it.pw, h: it.ph, rot: it.rot }));
+  const used = placed.reduce((s, p) => s + p.w * p.h, 0);
+  return { placed, used, area, largest: best.largest };
+}
+function computePacks(st) {
+  const sheets = {};
+  for (const sh of st.settings.sheets) {
+    const r = packSheet(sh, st.pieces.filter(p => p.sheet === sh.id), st.settings);
+    if (!r) return { ok: false, failed: sh };
+    sheets[sh.id] = r;
+  }
+  return { ok: true, sheets };
+}
+
+/* ---------------- State ---------------- */
+let state = null, packs = null, selected = null, undo = [], dl = null;
+let addColour = 'T';
+
+function sheetOf(id, st = state) { return st.settings.sheets.find(s => s.id === id); }
+function pieceById(id, st = state) { return st.pieces.find(p => p.id === id); }
+function nextId(st, sheetId) { st.seq[sheetId] = (st.seq[sheetId] || 0) + 1; return sheetId + st.seq[sheetId]; }
+
+function persist() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ } }
+
+function failMessage(next, res, ctx) {
+  const sh = res.failed;
+  const cur = packs && packs.sheets[sh.id];
+  const who = ctx && ctx.isNew ? 'A ' + fmt(ctx.w) + ' × ' + fmt(ctx.h) + ' piece' : ctx && ctx.id ? ctx.id : 'That';
+  let msg = who + ' won’t fit on the ' + sh.name + ' sheet.';
+  if (cur) {
+    const left = cur.area - cur.used;
+    msg += ' ' + Math.round(left).toLocaleString() + ' cm² left, largest free area ' + fmt(cur.largest.w) + ' × ' + fmt(cur.largest.h) + ' cm.';
+    if (ctx && ctx.w) {
+      const f = footprint(ctx, next.settings), L = cur.largest;
+      const fits = (a, b) => a <= L.w + EPS && b <= L.h + EPS;
+      if (!fits(f.w, f.h) && fits(f.h, f.w)) msg += ' It would fit with the flutes running the other way.';
+    }
+  }
+  return msg;
+}
+
+function commit(next, ctx) {
+  const res = computePacks(next);
+  if (!res.ok) { toast(failMessage(next, res, ctx), true); return false; }
+  undo.push(JSON.stringify(state));
+  if (undo.length > 80) undo.shift();
+  state = next; packs = res;
+  if (selected && !pieceById(selected)) selected = null;
+  persist(); render();
+  return true;
+}
+
+/* ---------------- Placement helpers ---------------- */
+const overlapArea = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+function findSpot(st, win, w, h, excludeId) {
+  const W = st.settings.windows[win]; if (!W || w > W.w + EPS || h > W.h + EPS) return null;
+  const others = st.pieces.filter(p => p.win === win && p.id !== excludeId);
+  const step = Math.max(0.5, +st.settings.snap || 1);
+  const xs = new Set([0, W.w - w]), ys = new Set([0, W.h - h]);
+  for (const o of others) { xs.add(o.x + o.w); xs.add(o.x - w); ys.add(o.y + o.h); ys.add(o.y - h); }
+  for (let v = 0; v <= W.w - w + EPS; v += step) xs.add(v);
+  for (let v = 0; v <= W.h - h + EPS; v += step) ys.add(v);
+  const X = [...xs].filter(v => v >= -EPS && v + w <= W.w + EPS).sort((a, b) => a - b);
+  const Y = [...ys].filter(v => v >= -EPS && v + h <= W.h + EPS).sort((a, b) => a - b);
+  for (const y of Y) for (const x of X) {
+    const r = { x, y, w, h };
+    if (!others.some(o => overlapArea(r, o) > 0.01)) return { x: Math.max(0, x), y: Math.max(0, y) };
+  }
+  return null;
+}
+function overlapIds(st) {
+  const ids = new Set();
+  const placed = st.pieces.filter(p => p.win !== null);
+  for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
+    const a = placed[i], b = placed[j];
+    if (a.win === b.win && overlapArea(a, b) > 0.01) { ids.add(a.id); ids.add(b.id); }
+  }
+  return ids;
+}
+function clampToWindow(st, p) {
+  if (p.win === null) return true;
+  const W = st.settings.windows[p.win];
+  if (!W || p.w > W.w + EPS || p.h > W.h + EPS) { p.win = null; p.x = 0; p.y = 0; return false; }
+  p.x = Math.min(Math.max(0, p.x), W.w - p.w);
+  p.y = Math.min(Math.max(0, p.y), W.h - p.h);
+  return true;
+}
+
+/* ---------------- Geometry of the windows view ---------------- */
+const M = 5, GAP = 10, TOP = 10;
+function geom(st) {
+  const wins = []; let x = M, maxH = 0;
+  st.settings.windows.forEach(w => { wins.push({ x, y: TOP, w: w.w, h: w.h }); x += w.w + GAP; maxH = Math.max(maxH, w.h); });
+  let W = x - GAP + M;
+  const tray = st.pieces.filter(p => p.win === null);
+  const trayY = TOP + maxH + 14;
+  for (const p of tray) W = Math.max(W, p.w + 2 * M + 4);
+  const pos = {}; let cx = M + 3, cy = trayY + 6, rowH = 0;
+  for (const p of tray) {
+    if (cx + p.w > W - M - 2 && cx > M + 3) { cx = M + 3; cy += rowH + 3; rowH = 0; }
+    pos[p.id] = { x: cx, y: cy }; cx += p.w + 3; rowH = Math.max(rowH, p.h);
+  }
+  const trayH = Math.max(22, (cy - trayY) + rowH + 4);
+  return { wins, W, trayY, trayH, H: trayY + trayH + 3, trayPos: pos };
+}
+
+/* ---------------- SVG helpers ---------------- */
+function el(name, attrs, parent) {
+  const n = document.createElementNS(NS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+function defsMarkup() {
+  return `<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-sky-top"/><stop offset="1" class="st-sky-bot"/></linearGradient>
+  <linearGradient id="ribT" x1="0" y1="0" x2="1" y2="0"><stop offset="0" class="st-tea-lo"/><stop offset=".45" class="st-tea-hi"/><stop offset=".7" class="st-tea"/><stop offset="1" class="st-tea-lo"/></linearGradient>
+  <linearGradient id="ribC" x1="0" y1="0" x2="1" y2="0"><stop offset="0" class="st-cl-lo"/><stop offset=".45" class="st-cl-hi"/><stop offset=".7" class="st-cl"/><stop offset="1" class="st-cl-lo"/></linearGradient>
+  <pattern id="flT-v" width="2" height="10" patternUnits="userSpaceOnUse"><rect width="2" height="10" fill="url(#ribT)" opacity=".88"/></pattern>
+  <pattern id="flT-h" width="2" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(90)"><rect width="2" height="10" fill="url(#ribT)" opacity=".88"/></pattern>
+  <pattern id="flC-v" width="2" height="10" patternUnits="userSpaceOnUse"><rect width="2" height="10" fill="url(#ribC)" opacity=".7"/></pattern>
+  <pattern id="flC-h" width="2" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(90)"><rect width="2" height="10" fill="url(#ribC)" opacity=".7"/></pattern>
+</defs>`;
+}
+function fillFor(sheetId, flute) { return `url(#fl${sheetId === 'T' ? 'T' : 'C'}-${flute})`; }
+
+/* ---------------- Render ---------------- */
+function render() {
+  $('#verName').value = state.name;
+  $('#verTag').textContent = 'v' + state.version;
+  $('#btnUndo').disabled = !undo.length;
+  renderStock(); renderAddPanel(); renderWindows(); renderSelected(); renderSheets(); renderList();
+}
+
+function renderStock() {
+  const box = $('#stock'); box.innerHTML = '';
+  for (const sh of state.settings.sheets) {
+    const pk = packs.sheets[sh.id];
+    const pct = pk.area ? pk.used / pk.area * 100 : 0;
+    const n = state.pieces.filter(p => p.sheet === sh.id).length;
+    const d = document.createElement('div'); d.className = 'meter';
+    d.innerHTML = `<div class="row1"><span class="name"><span class="sw ${sh.id === 'T' ? 'T' : 'C'}"></span>${esc(sh.name)} <span class="num" style="font-weight:400;color:var(--muted);font-size:.8rem">${fmt(sh.w)} × ${fmt(sh.h)}</span></span><span class="num">${Math.round(pct)}% used</span></div>
+      <div class="bar"><i style="width:${Math.min(100, pct)}%;background:${sh.id === 'T' ? 'var(--tea)' : 'var(--clear)'}"></i></div>
+      <div class="detail num">${n} piece${n === 1 ? '' : 's'} · ${Math.round(pk.area - pk.used).toLocaleString()} cm² left · largest free ${fmt(pk.largest.w)} × ${fmt(pk.largest.h)}</div>`;
+    box.appendChild(d);
+  }
+}
+
+function renderAddPanel() {
+  const seg = $('#addColour'); seg.innerHTML = '';
+  if (!sheetOf(addColour)) addColour = state.settings.sheets[0].id;
+  for (const sh of state.settings.sheets) {
+    const b = document.createElement('button'); b.type = 'button';
+    b.setAttribute('aria-pressed', String(sh.id === addColour));
+    b.innerHTML = `<span class="sw ${sh.id === 'T' ? 'T' : 'C'}"></span>${esc(sh.name)}`;
+    b.onclick = () => { addColour = sh.id; renderAddPanel(); };
+    seg.appendChild(b);
+  }
+  const pk = packs.sheets[addColour];
+  $('#addFrom').textContent = 'Largest free: ' + fmt(pk.largest.w) + ' × ' + fmt(pk.largest.h);
+  const tgt = $('#addTarget'); const keep = tgt.value;
+  tgt.innerHTML = '<option value="auto">First free spot</option>' + state.settings.windows.map((w, i) => `<option value="${i}">${esc(w.name)} window</option>`).join('') + '<option value="tray">Unplaced tray</option>';
+  if ([...tgt.options].some(o => o.value === keep)) tgt.value = keep;
+  const pr = $('#presets');
+  if (!pr.childElementCount) {
+    const W = state.settings.windows[0];
+    [[10, 10], [15, 15], [20, 20], [23, 23], [W.w, 10], [W.w, 20], [W.w / 2, 30], [W.w / 3, W.w / 3]].forEach(([w, h]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = fmt(w) + '×' + fmt(h);
+      b.onclick = () => { $('#addW').value = fmt(w); $('#addH').value = fmt(h); };
+      pr.appendChild(b);
+    });
+  }
+  $('#kerfNote').textContent = fmt(state.settings.kerf) + ' cm cut gap';
+}
+
+let G = null; // current geometry
+function renderWindows() {
+  const svg = $('#winSvg');
+  G = geom(state);
+  svg.setAttribute('viewBox', `0 0 ${G.W} ${G.H}`);
+  svg.innerHTML = defsMarkup();
+  const ov = overlapIds(state);
+  G.wins.forEach((w, i) => {
+    const S = state.settings.windows[i];
+    el('rect', { x: w.x - 1.6, y: w.y - 1.6, width: w.w + 3.2, height: w.h + 3.2, class: 'frame', 'stroke-width': 2.2, rx: .6 }, svg);
+    el('rect', { x: w.x, y: w.y, width: w.w, height: w.h, class: 'glass', 'data-win': i }, svg);
+    for (let gx = 5; gx < w.w; gx += 5) el('line', { x1: w.x + gx, y1: w.y, x2: w.x + gx, y2: w.y + w.h, class: 'gridline' + (gx % 10 === 0 ? ' major' : '') }, svg);
+    for (let gy = 5; gy < w.h; gy += 5) el('line', { x1: w.x, y1: w.y + gy, x2: w.x + w.w, y2: w.y + gy, class: 'gridline' + (gy % 10 === 0 ? ' major' : '') }, svg);
+    const t = el('text', { x: w.x - 1.6, y: w.y - 4.2, class: 'wlabel' }, svg); t.textContent = S.name;
+    const d = el('text', { x: w.x + w.w + 1.6, y: w.y - 4.2, class: 'wdim', 'text-anchor': 'end' }, svg); d.textContent = fmt(S.w) + ' × ' + fmt(S.h) + ' cm';
+  });
+  el('rect', { x: M, y: G.trayY, width: G.W - 2 * M, height: G.trayH, class: 'tray-box', rx: 1.5 }, svg);
+  const tl = el('text', { x: M + 2, y: G.trayY - 1.8, class: 'tray-label' }, svg);
+  tl.textContent = state.pieces.some(p => p.win === null) ? 'Unplaced: drag onto a window' : 'Unplaced tray (drag pieces here to take them off a window)';
+  const layer = el('g', { id: 'pieces' }, svg);
+  for (const p of state.pieces) drawPiece(layer, p, ov.has(p.id));
+  const tip = el('text', { id: 'dragTip', class: 'drag-tip', x: 0, y: 0 }, svg); tip.style.display = 'none';
+}
+function absPos(p) {
+  if (p.win === null) return G.trayPos[p.id] || { x: M + 3, y: G.trayY + 6 };
+  const w = G.wins[p.win]; return { x: w.x + p.x, y: w.y + p.y };
+}
+function drawPiece(layer, p, overlap) {
+  const a = absPos(p);
+  const g = el('g', { class: 'piece' + (p.id === selected ? ' sel' : '') + (overlap ? ' overlap' : ''), 'data-id': p.id, transform: `translate(${a.x} ${a.y})` }, layer);
+  el('rect', { width: p.w, height: p.h, fill: fillFor(p.sheet, p.flute) }, g);
+  el('rect', { width: p.w, height: p.h, class: 'lead' }, g);
+  el('rect', { x: -1, y: -1, width: p.w + 2, height: p.h + 2, class: 'hit' }, g);
+  const fs = Math.max(1.6, Math.min(4, p.w / 3.2, p.h / 2.2));
+  const t = el('text', { x: p.w / 2, y: p.h / 2 + fs * .35, 'text-anchor': 'middle', class: 'plabel', 'font-size': fs }, g);
+  t.textContent = p.id;
+  if (p.h > fs * 3.2 && p.w > 10) {
+    const s = el('text', { x: p.w / 2, y: p.h / 2 + fs * 1.45, 'text-anchor': 'middle', class: 'plabel', 'font-size': fs * .55, style: 'font-weight:400' }, g);
+    s.textContent = fmt(p.w) + '×' + fmt(p.h);
+  }
+  return g;
+}
+
+function renderSelected() {
+  const box = $('#selPanel');
+  const p = selected && pieceById(selected);
+  if (!p) {
+    box.innerHTML = '<div class="panel-head"><h2>Selected piece</h2></div><p class="empty">Tap a piece on the windows, the sheets or the list to edit, rotate, nudge or delete it.</p>';
+    return;
+  }
+  const sh = sheetOf(p.sheet); const pl = packs.sheets[p.sheet].placed.find(q => q.id === p.id);
+  const winOpts = state.settings.windows.map((w, i) => `<option value="${i}" ${p.win === i ? 'selected' : ''}>${esc(w.name)}</option>`).join('') + `<option value="tray" ${p.win === null ? 'selected' : ''}>Unplaced</option>`;
+  box.innerHTML = `<div class="panel-head"><h2>Selected piece</h2><span class="num" style="font-weight:700;display:flex;gap:6px;align-items:center"><span class="sw ${p.sheet === 'T' ? 'T' : 'C'}"></span>${esc(p.id)}</span></div>
+    <div class="grid4">
+      <label for="sW">Width<input id="sW" type="number" min="1" step="0.5" value="${fmt(p.w)}"></label>
+      <label for="sH">Height<input id="sH" type="number" min="1" step="0.5" value="${fmt(p.h)}"></label>
+      <label for="sX">From left<input id="sX" type="number" step="0.5" value="${fmt(p.x)}" ${p.win === null ? 'disabled' : ''}></label>
+      <label for="sY">From top<input id="sY" type="number" step="0.5" value="${fmt(p.y)}" ${p.win === null ? 'disabled' : ''}></label>
+    </div>
+    <div class="grid3">
+      <label for="sSheet">Film<select id="sSheet">${state.settings.sheets.map(s => `<option value="${s.id}" ${s.id === p.sheet ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+      <label for="sFlute">Flutes<select id="sFlute"><option value="v" ${p.flute === 'v' ? 'selected' : ''}>Vertical</option><option value="h" ${p.flute === 'h' ? 'selected' : ''}>Horizontal</option></select></label>
+      <label for="sWin">Window<select id="sWin">${winOpts}</select></label>
+    </div>
+    <div class="row" style="justify-content:space-between">
+      <div class="nudge" aria-label="Nudge">
+        <button type="button" data-n="-1,0" title="Left">←</button><button type="button" data-n="0,-1" title="Up">↑</button><button type="button" data-n="0,1" title="Down">↓</button><button type="button" data-n="1,0" title="Right">→</button>
+      </div>
+      <div class="row">
+        <button type="button" id="sRot">Rotate 90°</button>
+        <button type="button" id="sDup">Duplicate</button>
+        <button type="button" id="sDel" class="danger">Delete</button>
+      </div>
+    </div>
+    <p class="note num">Cut from ${esc(sh.name)} at ${pl ? fmt(pl.x) + ', ' + fmt(pl.y) : '?'} cm${pl && pl.rot ? ' (turned 90° on the sheet)' : ''} · ${fmt(p.w * p.h)} cm²</p>`;
+  const upd = fn => { const n = clone(state); const q = pieceById(p.id, n); fn(q, n); clampToWindow(n, q); commit(n, q); };
+  $('#sW').onchange = e => { const v = +e.target.value; if (v > 0) upd(q => { q.w = v; }); else render(); };
+  $('#sH').onchange = e => { const v = +e.target.value; if (v > 0) upd(q => { q.h = v; }); else render(); };
+  $('#sX').onchange = e => upd(q => { q.x = +e.target.value || 0; });
+  $('#sY').onchange = e => upd(q => { q.y = +e.target.value || 0; });
+  $('#sFlute').onchange = e => upd(q => { q.flute = e.target.value; });
+  $('#sSheet').onchange = e => {
+    const n = clone(state); const q = pieceById(p.id, n); const nid = nextId(n, e.target.value);
+    q.sheet = e.target.value; q.id = nid; if (commit(n, q)) { selected = nid; render(); }
+  };
+  $('#sWin').onchange = e => {
+    const v = e.target.value; const n = clone(state); const q = pieceById(p.id, n);
+    if (v === 'tray') { q.win = null; q.x = 0; q.y = 0; commit(n, q); return; }
+    const spot = findSpot(n, +v, q.w, q.h, q.id);
+    if (!spot) { const W = n.settings.windows[+v]; if (q.w > W.w || q.h > W.h) { toast(q.id + ' is bigger than the ' + W.name + ' window.', true); render(); return; } }
+    q.win = +v; q.x = spot ? spot.x : 0; q.y = spot ? spot.y : 0; commit(n, q);
+  };
+  box.querySelectorAll('[data-n]').forEach(b => b.onclick = () => nudge(b.dataset.n.split(',').map(Number)));
+  $('#sRot').onclick = () => rotateSel();
+  $('#sDup').onclick = () => duplicateSel();
+  $('#sDel').onclick = () => deleteSel();
+}
+function nudge([dx, dy]) {
+  const p = selected && pieceById(selected); if (!p || p.win === null) return;
+  const s = +state.settings.snap || 1;
+  const n = clone(state); const q = pieceById(p.id, n); q.x = Math.round((q.x + dx * s) * 100) / 100; q.y = Math.round((q.y + dy * s) * 100) / 100; clampToWindow(n, q); commit(n, q);
+}
+function rotateSel() {
+  const p = selected && pieceById(selected); if (!p) return;
+  const n = clone(state); const q = pieceById(p.id, n);
+  const cx = q.x + q.w / 2, cy = q.y + q.h / 2;
+  [q.w, q.h] = [q.h, q.w]; q.flute = q.flute === 'v' ? 'h' : 'v';
+  if (q.win !== null) {
+    const s = +n.settings.snap || 1;
+    q.x = Math.round((cx - q.w / 2) / s) * s; q.y = Math.round((cy - q.h / 2) / s) * s;
+    if (!clampToWindow(n, q)) toast(q.id + ' no longer fits the window, so it moved to the tray.');
+  }
+  commit(n, q);
+}
+function duplicateSel() {
+  const p = selected && pieceById(selected); if (!p) return;
+  const n = clone(state); const q = clone(p); q.id = nextId(n, p.sheet);
+  const spot = p.win !== null ? findSpot(n, p.win, q.w, q.h) : null;
+  if (spot) { q.x = spot.x; q.y = spot.y; } else { q.win = null; q.x = 0; q.y = 0; }
+  n.pieces.push(q);
+  if (commit(n, q)) { selected = q.id; render(); toast('Added ' + q.id + (spot ? '' : ' to the tray')); }
+}
+function deleteSel() {
+  const p = selected && pieceById(selected); if (!p) return;
+  const n = clone(state); n.pieces = n.pieces.filter(q => q.id !== p.id); selected = null;
+  if (commit(n)) toast('Deleted ' + p.id + '. Its film is back on the ' + sheetOf(p.sheet).name + ' sheet.');
+}
+
+function renderSheets() {
+  const box = $('#sheets'); box.innerHTML = '';
+  for (const sh of state.settings.sheets) {
+    const pk = packs.sheets[sh.id];
+    const card = document.createElement('div'); card.className = 'sheet-card';
+    card.innerHTML = `<div class="cap"><b>${esc(sh.name)}</b><span class="num" style="color:var(--muted)">${Math.round(pk.used).toLocaleString()} of ${Math.round(pk.area).toLocaleString()} cm² cut</span></div>`;
+    const svg = el('svg', { viewBox: `-1 -1 ${sh.w + 2} ${sh.h + 2}`, role: 'img', 'aria-label': sh.name + ' sheet cutting layout' });
+    svg.innerHTML = defsMarkup().replace(/id="/g, 'id="s' + sh.id).replace(/url\(#/g, 'url(#s' + sh.id);
+    el('rect', { x: 0, y: 0, width: sh.w, height: sh.h, class: 'sheet-bg' }, svg);
+    const ribsV = state.settings.fluteAxis === 'h';
+    if (ribsV) for (let x = 4; x < sh.w; x += 4) el('line', { x1: x, y1: 0, x2: x, y2: sh.h, class: 'sheet-rib' }, svg);
+    else for (let y = 4; y < sh.h; y += 4) el('line', { x1: 0, y1: y, x2: sh.w, y2: y, class: 'sheet-rib' }, svg);
+    for (const pl of pk.placed) {
+      const ribDir = ribsV ? 'v' : 'h';
+      const r = el('rect', { x: pl.x, y: pl.y, width: pl.w, height: pl.h, class: 'sheet-piece' + (pl.id === selected ? ' sel' : ''), fill: `url(#s${sh.id}fl${sh.id === 'T' ? 'T' : 'C'}-${ribDir})`, 'data-id': pl.id }, svg);
+      r.addEventListener('click', () => select(pl.id));
+      const fs = Math.max(2, Math.min(5, pl.w / 3, pl.h / 2));
+      const t = el('text', { x: pl.x + pl.w / 2, y: pl.y + pl.h / 2 + fs * .35, 'text-anchor': 'middle', 'font-size': fs, class: 'sheet-label' }, svg); t.textContent = pl.id;
+    }
+    card.appendChild(svg);
+    box.appendChild(card);
+  }
+}
+
+function whereText(p) { return p.win === null ? 'Unplaced' : state.settings.windows[p.win].name + ' @ ' + fmt(p.x) + ', ' + fmt(p.y); }
+function sortedPieces(st = state) {
+  return st.pieces.slice().sort((a, b) => a.sheet === b.sheet ? (parseInt(a.id.slice(1)) || 0) - (parseInt(b.id.slice(1)) || 0) : (a.sheet < b.sheet ? -1 : 1));
+}
+function renderList() {
+  const ov = overlapIds(state);
+  $('#pieceCount').textContent = state.pieces.length + ' total' + (ov.size ? ' · ' + ov.size + ' overlapping' : '');
+  if (!state.pieces.length) { $('#list').innerHTML = '<p class="empty">No pieces yet. Set a size above and press “Cut from sheet”.</p>'; return; }
+  const rows = sortedPieces().map(p => `<tr data-id="${esc(p.id)}" class="${p.id === selected ? 'sel' : ''}"><td><span class="sw ${p.sheet === 'T' ? 'T' : 'C'}" style="vertical-align:-2px"></span> ${esc(p.id)}</td><td>${fmt(p.w)} × ${fmt(p.h)}</td><td>${p.flute === 'v' ? '┃ vert' : '☰ horiz'}</td><td class="${ov.has(p.id) ? 'warn' : ''}">${esc(whereText(p))}${ov.has(p.id) ? ' ⚠' : ''}</td></tr>`).join('');
+  $('#list').innerHTML = `<table><thead><tr><th>ID</th><th>Size (cm)</th><th>Flutes</th><th>Window position (x, y)</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $('#list').querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => select(tr.dataset.id));
+}
+
+function select(id) { selected = id; renderWindows(); renderSelected(); renderSheets(); renderList(); }
+
+/* ---------------- Add ---------------- */
+function addPieces() {
+  const w = +$('#addW').value, h = +$('#addH').value;
+  const qty = Math.max(1, Math.min(40, Math.floor(+$('#addQty').value || 1)));
+  const flute = $('#addFlute').value, target = $('#addTarget').value;
+  if (!(w > 0 && h > 0)) { toast('Enter a width and height in centimetres.', true); return; }
+  const n = clone(state); let last = null, toTray = 0, short = '';
+  for (let i = 0; i < qty; i++) {
+    const p = { id: nextId(n, addColour), sheet: addColour, w, h, flute, win: null, x: 0, y: 0 };
+    let spot = null;
+    if (target === 'auto') {
+      for (let wi = 0; wi < n.settings.windows.length && !spot; wi++) { const s = findSpot(n, wi, w, h); if (s) spot = Object.assign({ win: wi }, s); }
+    } else if (target !== 'tray') {
+      const s = findSpot(n, +target, w, h); if (s) spot = Object.assign({ win: +target }, s);
+    }
+    if (spot) { p.win = spot.win; p.x = spot.x; p.y = spot.y; } else if (target !== 'tray') toTray++;
+    n.pieces.push(p); last = p;
+    const res = computePacks(n);
+    if (!res.ok) {
+      n.pieces.pop();
+      if (i === 0) { p.isNew = true; toast(failMessage(n, res, p), true); return; }
+      if (p.win === null && target !== 'tray') toTray--;
+      short = 'Only ' + i + ' of ' + qty + ' fit on the ' + sheetOf(addColour).name + ' sheet.';
+      break;
+    }
+  }
+  if (commit(n, last)) {
+    selected = n.pieces[n.pieces.length - 1].id; render();
+    const trayMsg = toTray ? (toTray === 1 && qty === 1 ? 'No free space on the windows, so it went to the tray.' : toTray + ' went to the tray (no free space on the windows).') : '';
+    if (short) toast(short + (trayMsg ? ' ' + trayMsg : ''), true);
+    else if (trayMsg) toast(trayMsg);
+  }
+}
+
+/* ---------------- Drag and drop ---------------- */
+let drag = null;
+function svgPt(e) {
+  const svg = $('#winSvg'); const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+function onDown(e) {
+  const g = e.target.closest && e.target.closest('.piece');
+  if (!g) { if (e.target.closest && (e.target.classList.contains('glass') || e.target === $('#winSvg'))) { if (selected) select(null); } return; }
+  if (e.button !== undefined && e.button !== 0) return;
+  e.preventDefault();
+  const p = pieceById(g.dataset.id); const a = absPos(p); const pt = svgPt(e);
+  drag = { id: p.id, g, offX: pt.x - a.x, offY: pt.y - a.y, sx: pt.x, sy: pt.y, moved: false, target: { win: p.win, x: p.x, y: p.y } };
+  try { $('#winSvg').setPointerCapture(e.pointerId); } catch (_) {}
+}
+function onMove(e) {
+  if (!drag) return;
+  const pt = svgPt(e);
+  if (!drag.moved && Math.hypot(pt.x - drag.sx, pt.y - drag.sy) < 1) return;
+  if (!drag.moved) { drag.moved = true; drag.g.classList.add('dragging'); drag.g.parentNode.appendChild(drag.g); }
+  const p = pieceById(drag.id);
+  const ax = pt.x - drag.offX, ay = pt.y - drag.offY, cx = ax + p.w / 2, cy = ay + p.h / 2;
+  let win = null;
+  if (cy < G.trayY - 4) {
+    let bestD = Infinity;
+    G.wins.forEach((w, i) => { const d = cx < w.x ? w.x - cx : cx > w.x + w.w ? cx - (w.x + w.w) : 0; if (d < bestD) { bestD = d; win = i; } });
+    const S = state.settings.windows[win]; if (p.w > S.w + EPS || p.h > S.h + EPS) win = null;
+  }
+  const tip = $('#dragTip');
+  if (win === null) {
+    drag.target = { win: null, x: 0, y: 0 };
+    drag.g.setAttribute('transform', `translate(${ax} ${ay})`);
+    tip.style.display = 'none';
+    $('#readL').innerHTML = `<b>${esc(p.id)}</b> → unplaced tray`;
+    return;
+  }
+  const w = G.wins[win], S = state.settings.windows[win], snap = +state.settings.snap || 1;
+  let x = Math.round((ax - w.x) / snap) * snap, y = Math.round((ay - w.y) / snap) * snap;
+  const others = state.pieces.filter(o => o.win === win && o.id !== p.id);
+  // Edges of the window and neighbouring pieces pull the piece in when it's within 1.6 cm.
+  const magnet = (snapped, raw, cands) => { let b = snapped, bd = 1.6; for (const c of cands) { const d = Math.abs(raw - c); if (d < bd) { bd = d; b = c; } } return b; };
+  const xc = [0, S.w - p.w], yc = [0, S.h - p.h];
+  for (const o of others) { xc.push(o.x, o.x + o.w, o.x - p.w, o.x + o.w - p.w); yc.push(o.y, o.y + o.h, o.y - p.h, o.y + o.h - p.h); }
+  x = magnet(x, ax - w.x, xc); y = magnet(y, ay - w.y, yc);
+  x = Math.min(Math.max(0, x), S.w - p.w); y = Math.min(Math.max(0, y), S.h - p.h);
+  x = Math.round(x * 100) / 100; y = Math.round(y * 100) / 100;
+  drag.target = { win, x, y };
+  drag.g.setAttribute('transform', `translate(${w.x + x} ${w.y + y})`);
+  tip.style.display = '';
+  tip.setAttribute('x', w.x + x); tip.setAttribute('y', Math.max(3, w.y + y - 1.2));
+  tip.textContent = `${fmt(x)}, ${fmt(y)}`;
+  $('#readL').innerHTML = `<b>${esc(p.id)}</b> → ${esc(S.name)} · ${fmt(x)} cm from left, ${fmt(y)} cm from top`;
+  $('#readR').textContent = `${fmt(S.w - x - p.w)} right · ${fmt(S.h - y - p.h)} bottom`;
+}
+function onUp() {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.moved) { select(d.id); return; }
+  const n = clone(state); const q = pieceById(d.id, n);
+  Object.assign(q, d.target);
+  selected = d.id;
+  $('#readR').textContent = '';
+  commit(n, q);
+  $('#readL').textContent = 'Drag a piece to move it. Tap to select it.';
+}
+
+/* ---------------- Save / load ---------------- */
+function stamp() { const d = new Date(), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; }
+function slug(s) { return (String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'layout').slice(0, 40); }
+async function offerFile(filename, data, mime) {
+  if (dl) {
+    try { await dl.save({ filename, data }); return 'saved'; }
+    catch (e) {
+      if (e && e.code === 'declined') return 'declined';
+      if (e && e.code === 'rate_limited') { toast('A save prompt is already open.', true); return 'busy'; }
+    }
+  }
+  try {
+    const url = URL.createObjectURL(new Blob([data], { type: mime }));
+    const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    return 'saved';
+  } catch (e) { return 'failed'; }
+}
+async function saveVersion() {
+  const data = { app: 'window-glass-planner', format: 1, savedAt: new Date().toISOString(), name: state.name, version: state.version, settings: state.settings, pieces: state.pieces, seq: state.seq };
+  const fn = `${slug(state.name)}-v${state.version}-${stamp()}.json`;
+  const r = await offerFile(fn, JSON.stringify(data, null, 2), 'application/json');
+  if (r === 'saved') { toast('Saved ' + fn); state.version += 1; persist(); render(); }
+  else if (r === 'declined') toast('Save cancelled.');
+  else if (r === 'failed') toast('This view can’t save files. Open the page in a browser to save.', true);
+}
+function normalise(o) {
+  if (!o || typeof o !== 'object' || !Array.isArray(o.pieces) || !o.settings) throw new Error('This file isn’t a Window Glass Planner layout.');
+  const s = o.settings;
+  const num = (v, d) => (typeof v === 'number' && isFinite(v) && v >= 0) ? v : d;
+  const settings = {
+    windows: (Array.isArray(s.windows) && s.windows.length ? s.windows : DEFAULT_SETTINGS.windows).map((w, i) => ({ name: String(w.name || 'Window ' + (i + 1)).slice(0, 30), w: num(w.w, 69) || 69, h: num(w.h, 170) || 170 })),
+    sheets: (Array.isArray(s.sheets) && s.sheets.length ? s.sheets : DEFAULT_SETTINGS.sheets).map(sh => ({ id: String(sh.id || 'C').slice(0, 3), name: String(sh.name || sh.id).slice(0, 30), w: num(sh.w, 152) || 152, h: num(sh.h, 100) || 100 })),
+    kerf: num(s.kerf, 0.5), snap: num(s.snap, 1) || 1, fluteAxis: s.fluteAxis === 'w' ? 'w' : 'h'
+  };
+  const sheetIds = new Set(settings.sheets.map(x => x.id));
+  const pieces = o.pieces.map(p => ({
+    id: String(p.id), sheet: String(p.sheet), w: num(p.w, 0), h: num(p.h, 0), flute: p.flute === 'h' ? 'h' : 'v',
+    win: (p.win === null || p.win === undefined || p.win === 'tray') ? null : Math.floor(+p.win), x: num(p.x, 0), y: num(p.y, 0)
+  })).filter(p => p.w > 0 && p.h > 0 && sheetIds.has(p.sheet));
+  pieces.forEach(p => { if (p.win !== null && !(p.win >= 0 && p.win < settings.windows.length)) p.win = null; });
+  const seq = {};
+  for (const sh of settings.sheets) seq[sh.id] = Math.max(+(o.seq && o.seq[sh.id]) || 0, ...pieces.filter(p => p.sheet === sh.id).map(p => parseInt(p.id.slice(sh.id.length)) || 0), 0);
+  const st = { name: String(o.name || 'Loaded layout').slice(0, 60), version: Math.max(1, Math.floor(+o.version || 1)), settings, pieces, seq };
+  st.pieces.forEach(p => clampToWindow(st, p));
+  return st;
+}
+function loadFile(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const st = normalise(JSON.parse(r.result));
+      const res = computePacks(st);
+      if (!res.ok) { toast('That layout doesn’t fit on the ' + res.failed.name + ' sheet with the current cut gap, so it wasn’t loaded.', true); return; }
+      undo.push(JSON.stringify(state)); state = st; packs = res; selected = null; persist(); render();
+      toast('Loaded “' + st.name + '” (' + st.pieces.length + ' pieces).');
+    } catch (e) { toast(e.message && e.message.includes('Planner') ? e.message : 'Couldn’t read that file. Choose a .json saved from this planner.', true); }
+  };
+  r.readAsText(file);
+}
+
+/* ---------------- Spec sheet ---------------- */
+const SPEC_CSS = `body{margin:0;padding:14mm;font-family:Archivo,"Helvetica Neue",Arial,sans-serif;color:#111;background:#fff}
+.spec{display:grid;gap:18px}.spec h1{font-size:20px;margin:0}.spec h2{font-size:12px;margin:0 0 6px;text-transform:uppercase;letter-spacing:.08em;color:#333}
+.meta{font-size:12px;color:#444;display:flex;flex-wrap:wrap;gap:4px 18px}svg{width:100%;height:auto;display:block}.spec-win svg{max-height:760px}
+.sheets-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}table{border-collapse:collapse;width:100%;font-size:11px}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#444;border-bottom:1.5px solid #111;padding:3px 5px}
+td{border-bottom:1px solid #ccc;padding:3px 5px;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.warnbox{border:1.5px solid #111;padding:6px 8px;font-size:12px}.bar{margin-bottom:12px}.bar button{font:inherit;padding:6px 12px}
+@media print{body{padding:0}.bar{display:none}.page-break{break-before:page}tr{break-inside:avoid}@page{size:A4 portrait;margin:12mm}}`;
+function specPatterns() {
+  return `<defs>
+  <pattern id="pC-v" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="2" height="2" fill="#fff"/><line x1="1" y1="0" x2="1" y2="2" stroke="#9aa" stroke-width=".18"/></pattern>
+  <pattern id="pC-h" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="2" height="2" fill="#fff"/><line x1="0" y1="1" x2="2" y2="1" stroke="#9aa" stroke-width=".18"/></pattern>
+  <pattern id="pT-v" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="2" height="2" fill="#d9d9d9"/><line x1="1" y1="0" x2="1" y2="2" stroke="#777" stroke-width=".3"/></pattern>
+  <pattern id="pT-h" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="2" height="2" fill="#d9d9d9"/><line x1="0" y1="1" x2="2" y2="1" stroke="#777" stroke-width=".3"/></pattern>
+</defs>`;
+}
+const sp = (sheetId, fl) => `url(#p${sheetId === 'T' ? 'T' : 'C'}-${fl})`;
+function specWindowsSvg() {
+  const S = state.settings; const placed = state.pieces.filter(p => p.win !== null);
+  let x = 14; const wins = []; let maxH = 0;
+  S.windows.forEach(w => { wins.push({ x, y: 14 }); x += w.w + 22; maxH = Math.max(maxH, w.h); });
+  const W = x - 22 + 8, H = 14 + maxH + 12;
+  let s = `<svg xmlns="${NS}" viewBox="0 0 ${W} ${H}" font-family="JetBrains Mono, Menlo, monospace">${specPatterns()}`;
+  S.windows.forEach((w, i) => {
+    const o = wins[i];
+    s += `<rect x="${o.x}" y="${o.y}" width="${w.w}" height="${w.h}" fill="#fff" stroke="#111" stroke-width=".9"/>`;
+    s += `<text x="${o.x}" y="${o.y - 6}" font-size="3.6" font-weight="700" font-family="Archivo, Arial, sans-serif">${esc(w.name)} window</text>`;
+    s += `<text x="${o.x + w.w}" y="${o.y - 6}" font-size="2.6" text-anchor="end">${fmt(w.w)} × ${fmt(w.h)} cm</text>`;
+    for (let t = 0; t <= w.h + EPS; t += 10) s += `<line x1="${o.x - 2}" y1="${o.y + t}" x2="${o.x}" y2="${o.y + t}" stroke="#111" stroke-width=".2"/><text x="${o.x - 2.6}" y="${o.y + t + .8}" font-size="2" text-anchor="end" fill="#555">${t}</text>`;
+    for (let t = 0; t <= w.w + EPS; t += 10) s += `<line x1="${o.x + t}" y1="${o.y + w.h}" x2="${o.x + t}" y2="${o.y + w.h + 2}" stroke="#111" stroke-width=".2"/><text x="${o.x + t}" y="${o.y + w.h + 4.6}" font-size="2" text-anchor="middle" fill="#555">${t}</text>`;
+    for (const p of placed.filter(p => p.win === i)) {
+      const px = o.x + p.x, py = o.y + p.y;
+      s += `<rect x="${px}" y="${py}" width="${p.w}" height="${p.h}" fill="${sp(p.sheet, p.flute)}" stroke="#111" stroke-width=".5"/>`;
+      const fs = Math.max(1.6, Math.min(4.2, p.w / 3.4, p.h / 2.4));
+      s += `<text x="${px + p.w / 2}" y="${py + p.h / 2 + fs * .35}" font-size="${fs}" font-weight="700" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${fs * .25}">${esc(p.id)}</text>`;
+      if (p.h > fs * 3 && p.w > 9) s += `<text x="${px + p.w / 2}" y="${py + p.h / 2 + fs * 1.4}" font-size="${fs * .55}" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${fs * .15}">${fmt(p.w)}×${fmt(p.h)}</text>`;
+      if (p.w > 8 && p.h > 5) s += `<text x="${px + .8}" y="${py + 2.2}" font-size="1.6" fill="#333" paint-order="stroke" stroke="#fff" stroke-width=".4">${fmt(p.x)},${fmt(p.y)}</text>`;
+    }
+  });
+  return s + '</svg>';
+}
+function specSheetSvg(sh) {
+  const pk = packs.sheets[sh.id]; const ribsV = state.settings.fluteAxis === 'h';
+  let s = `<svg xmlns="${NS}" viewBox="-6 -6 ${sh.w + 10} ${sh.h + 12}" font-family="JetBrains Mono, Menlo, monospace">${specPatterns()}`;
+  s += `<rect x="0" y="0" width="${sh.w}" height="${sh.h}" fill="#fff" stroke="#111" stroke-width=".7"/>`;
+  for (let t = 0; t <= sh.w + EPS; t += 20) s += `<text x="${t}" y="-1.5" font-size="2.4" text-anchor="middle" fill="#555">${t}</text>`;
+  for (let t = 0; t <= sh.h + EPS; t += 20) s += `<text x="-1.5" y="${t + .9}" font-size="2.4" text-anchor="end" fill="#555">${t}</text>`;
+  for (const pl of pk.placed) {
+    s += `<rect x="${pl.x}" y="${pl.y}" width="${pl.w}" height="${pl.h}" fill="${sp(sh.id, ribsV ? 'v' : 'h')}" stroke="#111" stroke-width=".45"/>`;
+    const fs = Math.max(2, Math.min(5, pl.w / 3, pl.h / 2.2));
+    s += `<text x="${pl.x + pl.w / 2}" y="${pl.y + pl.h / 2 + fs * .35}" font-size="${fs}" font-weight="700" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${fs * .25}">${esc(pl.id)}</text>`;
+  }
+  s += `<text x="0" y="${sh.h + 5}" font-size="2.6" fill="#333">Flutes run ${ribsV ? 'top to bottom' : 'left to right'} on the sheet as drawn · cut gap ${fmt(state.settings.kerf)} cm</text>`;
+  return s + '</svg>';
+}
+function specMarkup() {
+  const S = state.settings; const ov = overlapIds(state);
+  const tray = state.pieces.filter(p => p.win === null);
+  const rows = sortedPieces().map(p => {
+    const pl = packs.sheets[p.sheet].placed.find(q => q.id === p.id);
+    return `<tr><td><b>${esc(p.id)}</b></td><td>${esc(sheetOf(p.sheet).name)}</td><td>${fmt(p.w)} × ${fmt(p.h)}</td><td>${p.flute === 'v' ? 'vertical' : 'horizontal'}</td><td>${pl ? fmt(pl.x) + ', ' + fmt(pl.y) + (pl.rot ? ' (turned)' : '') : ''}</td><td>${p.win === null ? '—' : esc(S.windows[p.win].name)}</td><td>${p.win === null ? '—' : fmt(p.x) + ', ' + fmt(p.y)}</td><td>${ov.has(p.id) ? 'OVERLAP' : ''}</td></tr>`;
+  }).join('');
+  const totals = S.sheets.map(sh => { const pk = packs.sheets[sh.id]; return `<span><b>${esc(sh.name)}:</b> ${Math.round(pk.used).toLocaleString()} cm² cut (${Math.round(pk.used / pk.area * 100)}%), ${Math.round(pk.area - pk.used).toLocaleString()} cm² offcut</span>`; }).join('');
+  const warn = [];
+  if (ov.size) warn.push('Overlapping pieces: ' + [...ov].sort().join(', ') + '.');
+  if (tray.length) warn.push('Not placed on a window yet: ' + tray.map(p => p.id).join(', ') + '.');
+  return `<div><h1>${esc(state.name)}</h1><div class="meta"><span>Version ${state.version}</span><span>${new Date().toLocaleString()}</span><span>${state.pieces.length} pieces</span><span>Positions are x, y in cm from the top-left corner of the glass</span></div></div>
+  ${warn.length ? `<div class="warnbox">${warn.map(esc).join('<br>')}</div>` : ''}
+  <div class="spec-win"><h2>Window layout</h2>${specWindowsSvg()}<div class="meta" style="margin-top:4px"><span>Light fill = ${esc(S.sheets[0] ? S.sheets[0].name : '')}</span><span>Grey fill = ${esc(S.sheets[1] ? S.sheets[1].name : '')}</span><span>Thin lines show flute direction</span><span>Small numbers in each piece = x, y</span></div></div>
+  <div class="page-break"><h2>Cutting sheets</h2><div class="sheets-row">${S.sheets.map(sh => `<div><div class="meta" style="margin-bottom:4px"><b>${esc(sh.name)}</b><span>${fmt(sh.w)} × ${fmt(sh.h)} cm</span></div>${specSheetSvg(sh)}</div>`).join('')}</div><div class="meta" style="margin-top:6px">${totals}</div></div>
+  <div><h2>Cut list</h2><table><thead><tr><th>ID</th><th>Film</th><th>W × H (cm)</th><th>Flutes</th><th>On sheet (x, y)</th><th>Window</th><th>On window (x, y)</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function openSpec() { $('#specBody').innerHTML = specMarkup(); $('#specModal').hidden = false; }
+async function downloadSpec() {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(state.name)} · spec</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap"><style>${SPEC_CSS}</style></head><body><div class="bar"><button onclick="window.print()">Print</button></div><div class="spec">${specMarkup()}</div></body></html>`;
+  const fn = `${slug(state.name)}-v${state.version}-spec.html`;
+  const r = await offerFile(fn, html, 'text/html');
+  if (r === 'saved') toast('Saved ' + fn + '. Open it and print.');
+  else if (r === 'declined') toast('Download cancelled.');
+}
+let printOpened = false;
+window.addEventListener('beforeprint', () => { if ($('#specModal').hidden) { openSpec(); printOpened = true; } else $('#specBody').innerHTML = specMarkup(); });
+window.addEventListener('afterprint', () => { if (printOpened) { $('#specModal').hidden = true; printOpened = false; } });
+
+/* ---------------- Settings ---------------- */
+function openSettings() {
+  const S = state.settings;
+  $('#setWins').innerHTML = S.windows.map((w, i) => `<label for="sw-n${i}">Name<input id="sw-n${i}" value="${esc(w.name)}" maxlength="30"></label><label for="sw-w${i}">Width<input id="sw-w${i}" type="number" min="1" step="0.5" value="${fmt(w.w)}"></label><label for="sw-h${i}">Height<input id="sw-h${i}" type="number" min="1" step="0.5" value="${fmt(w.h)}"></label>`).join('');
+  $('#setSheets').innerHTML = S.sheets.map((s, i) => `<label for="ss-n${i}">Name<input id="ss-n${i}" value="${esc(s.name)}" maxlength="30"></label><label for="ss-w${i}">Width<input id="ss-w${i}" type="number" min="1" step="0.5" value="${fmt(s.w)}"></label><label for="ss-h${i}">Height<input id="ss-h${i}" type="number" min="1" step="0.5" value="${fmt(s.h)}"></label>`).join('');
+  $('#setKerf').value = fmt(S.kerf); $('#setSnap').value = fmt(S.snap); $('#setAxis').value = S.fluteAxis;
+  const sh0 = S.sheets[0];
+  $('#setAxis').options[0].textContent = `height side (the ${fmt(sh0.h)} cm edge)`;
+  $('#setAxis').options[1].textContent = `width side (the ${fmt(sh0.w)} cm edge)`;
+  $('#settingsModal').hidden = false;
+}
+function applySettings(e) {
+  e.preventDefault();
+  const n = clone(state); const S = n.settings; let moved = 0;
+  S.windows.forEach((w, i) => { w.name = $('#sw-n' + i).value.trim() || w.name; w.w = +$('#sw-w' + i).value > 0 ? +$('#sw-w' + i).value : w.w; w.h = +$('#sw-h' + i).value > 0 ? +$('#sw-h' + i).value : w.h; });
+  S.sheets.forEach((s, i) => { s.name = $('#ss-n' + i).value.trim() || s.name; s.w = +$('#ss-w' + i).value > 0 ? +$('#ss-w' + i).value : s.w; s.h = +$('#ss-h' + i).value > 0 ? +$('#ss-h' + i).value : s.h; });
+  S.kerf = Math.max(0, +$('#setKerf').value || 0); S.snap = Math.max(0.1, +$('#setSnap').value || 1); S.fluteAxis = $('#setAxis').value;
+  n.pieces.forEach(p => { if (!clampToWindow(n, p)) moved++; });
+  if (commit(n)) { $('#settingsModal').hidden = true; $('#presets').innerHTML = ''; renderAddPanel(); toast('Settings applied.' + (moved ? ' ' + moved + ' piece(s) moved to the tray.' : '')); }
+}
+
+/* ---------------- Misc UI ---------------- */
+let toastT = 0;
+function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, err ? 6000 : 3200); }
+let clearArmed = 0;
+function clearAll() {
+  const b = $('#btnClear');
+  if (!clearArmed) { b.classList.add('armed'); b.textContent = 'Tap again to clear'; clearArmed = setTimeout(() => { b.classList.remove('armed'); b.textContent = 'Clear all'; clearArmed = 0; }, 3000); return; }
+  clearTimeout(clearArmed); clearArmed = 0; b.classList.remove('armed'); b.textContent = 'Clear all';
+  const n = clone(state); n.pieces = []; n.seq = {}; n.settings.sheets.forEach(s => n.seq[s.id] = 0);
+  if (n.name === 'Example layout') n.name = 'My windows';
+  selected = null; commit(n); toast('Cleared. Both sheets are full again. Undo brings it back.');
+}
+function doUndo() {
+  if (!undo.length) return;
+  state = JSON.parse(undo.pop()); packs = computePacks(state);
+  if (!packs.ok) { state = exampleState(); packs = computePacks(state); }
+  if (selected && !pieceById(selected)) selected = null; persist(); render();
+}
+
+/* ---------------- Boot ---------------- */
+function boot() {
+  let st = null;
+  try { const raw = localStorage.getItem(STORE_KEY); if (raw) st = normalise(JSON.parse(raw)); } catch (e) { st = null; }
+  if (st) { const r = computePacks(st); if (r.ok) { state = st; packs = r; } }
+  if (!state) { state = exampleState(); packs = computePacks(state); }
+  render();
+
+  const svg = $('#winSvg');
+  svg.addEventListener('pointerdown', onDown);
+  svg.addEventListener('pointermove', onMove);
+  svg.addEventListener('pointerup', onUp);
+  svg.addEventListener('pointercancel', onUp);
+  svg.addEventListener('touchstart', e => { if (e.target.closest && e.target.closest('.piece')) e.preventDefault(); }, { passive: false });
+
+  $('#btnAdd').onclick = addPieces;
+  $('#btnUndo').onclick = doUndo;
+  $('#btnSave').onclick = saveVersion;
+  $('#btnLoad').onclick = () => $('#fileIn').click();
+  $('#fileIn').onchange = e => { const f = e.target.files && e.target.files[0]; if (f) loadFile(f); e.target.value = ''; };
+  $('#btnSpec').onclick = openSpec;
+  $('#specClose').onclick = () => $('#specModal').hidden = true;
+  $('#specPrint').onclick = () => { try { window.print(); } catch (e) { toast('Printing isn’t available here. Download the spec instead.', true); } };
+  $('#specDownload').onclick = downloadSpec;
+  $('#btnSettings').onclick = openSettings;
+  $('#setClose').onclick = () => $('#settingsModal').hidden = true;
+  $('#settingsForm').onsubmit = applySettings;
+  $('#btnClear').onclick = clearAll;
+  $('#verName').onchange = e => { state.name = e.target.value.trim() || 'Untitled layout'; persist(); };
+  document.addEventListener('keydown', e => {
+    const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName);
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); doUndo(); return; }
+    if (e.key === 'Escape') { $('#settingsModal').hidden = true; $('#specModal').hidden = true; return; }
+    if (typing || !selected) return;
+    const m = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (m) { e.preventDefault(); nudge(m); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); }
+    else if (e.key.toLowerCase() === 'r') rotateSel();
+  });
+
+  if (window.claude && typeof window.claude.use === 'function') {
+    window.claude.use('downloads').then(d => { dl = d; }).catch(() => {});
+  }
+}
+boot();
+})();
+</script>
+
+</body>
+</html>
